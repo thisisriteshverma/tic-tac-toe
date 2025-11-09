@@ -1,0 +1,1646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Max-Feature Tic-Tac-Toe</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inter Font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s;
+        }
+        /* Common Background styles */
+        .bg-pattern-dark { background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05) 10px, transparent 10px, transparent 20px); }
+        .bg-pattern-retro { background-image: radial-gradient(circle, #EAB308 1px, transparent 1px); background-size: 20px 20px; }
+        .bg-pattern-ocean { background: radial-gradient(circle at center, rgba(103, 232, 249, 0.2) 0%, rgba(6, 182, 212, 0.1) 30%, transparent 70%); background-size: 100% 100%; }
+        /* Enhanced Love Pattern: Small pink hearts */
+        .bg-pattern-love { background-image: radial-gradient(circle at 100% 100%, #EC4899 1px, transparent 1px), radial-gradient(circle at 0% 0%, #F472B6 1px, transparent 1px); background-size: 20px 20px; }
+        /* Enhanced Panda Pattern: Subtle diagonal bamboo texture */
+        .bg-pattern-panda { background: linear-gradient(135deg, #ddd 10%, transparent 10%), linear-gradient(225deg, #ddd 10%, transparent 10%); background-size: 10px 10px; background-color: #ffffff; }
+
+        /* Custom Premium Button Style */
+        .premium-button-style {
+            background-image: linear-gradient(to right, #FCD34D 0%, #F59E0B 51%, #FCD34D 100%);
+            color: #1F2937; /* Dark text for contrast */
+            box-shadow: 0 10px 15px -3px rgba(253, 224, 71, 0.5), 0 4px 6px -2px rgba(253, 224, 71, 0.05); /* Gold shadow */
+            transition: all 0.5s;
+            background-size: 200% auto;
+        }
+        .premium-button-style:hover {
+            background-position: right center; /* change the direction of the change here */
+            box-shadow: 0 15px 20px -3px rgba(253, 224, 71, 0.7), 0 6px 8px -2px rgba(253, 224, 71, 0.1);
+            transform: scale(1.03);
+        }
+        
+        /* board-grid class will be dynamically set by JS */
+        .cell {
+            width: 100%;
+            height: 100%;
+            min-height: 50px; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4vmin;
+            cursor: pointer;
+            transition: background-color 0.15s, transform 0.1s, box-shadow 0.15s;
+        }
+        .cell:hover:not(.occupied) {
+            transform: scale(1.03);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .cell:active {
+            transform: scale(0.98);
+        }
+        .winning-cell {
+            animation: win-flash 0.5s infinite alternate;
+        }
+        @keyframes win-flash {
+            from { opacity: 1; }
+            to { opacity: 0.8; box-shadow: 0 0 15px 5px var(--accent-color); }
+        }
+
+        /* Loading Spinner */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--loading-bg, rgba(255, 255, 255, 0.95)); /* Use light background for initial load */
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        #loading-spinner {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid var(--loading-color, #3B82F6); /* Blue/Primary color */
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+
+
+        /* Responsive Layouts */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Mobile Navigation (Header/Toggle) */
+        .mobile-header {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        #main-nav-sidebar {
+            width: 100%;
+            height: auto;
+            position: absolute;
+            top: 64px; /* Below the header */
+            left: 0;
+            z-index: 10;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
+            display: none; /* Hidden by default on mobile */
+        }
+        .main-content {
+            width: 100%;
+            padding-top: 1rem;
+        }
+        
+        /* Desktop/Tablet Layout (min-width: 1024px) */
+        @media (min-width: 1024px) {
+            .app-container {
+                flex-direction: row;
+                max-width: 1400px;
+                margin: 0 auto;
+                min-height: 100vh;
+            }
+            .mobile-header {
+                display: none;
+            }
+            #main-nav-sidebar {
+                position: sticky;
+                top: 0;
+                display: block !important; /* Always visible on desktop */
+                width: 280px;
+                min-height: 100vh;
+                box-shadow: none;
+                padding-top: 1rem;
+                border-right: 1px solid rgba(0, 0, 0, 0.1);
+            }
+            .main-content {
+                flex-grow: 1;
+                padding: 2rem;
+            }
+        }
+    </style>
+    <!-- Removed all Firebase imports -->
+</head>
+<body class="min-h-screen transition-colors duration-500" id="body-container">
+    
+    <!-- LOADING OVERLAY (Used as a momentary splash screen, will disappear almost instantly) -->
+    <div id="loading-overlay" class="transition-opacity duration-500">
+        <div id="loading-spinner" class="mb-4"></div>
+        <p class="text-lg font-bold" id="loading-text">Loading game profile...</p>
+    </div>
+    <!-- END LOADING OVERLAY -->
+
+    <!-- Mobile Header (Visible on Mobile/Tablet) -->
+    <header class="mobile-header p-4 flex justify-between items-center lg:hidden" id="mobile-header">
+        <h1 class="text-xl font-bold">Tic-Tac-Toe Max</h1>
+        <button id="toggle-nav-btn" class="px-3 py-1 rounded-lg font-semibold transition-colors duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+    </header>
+
+    <main class="app-container">
+        
+        <!-- Permanent Left Navigation Sidebar (Desktop/Toggleable on Mobile) -->
+        <div id="main-nav-sidebar" class="p-6 transition-colors duration-500">
+            <h2 class="text-3xl font-extrabold mb-8 hidden lg:block">Tic-Tac-Toe Max</h2>
+            <nav class="space-y-3">
+                <button data-section="home" class="nav-link w-full text-left p-3 rounded-lg font-medium transition duration-150">
+                    <svg class="w-5 h-5 inline-block mr-3 align-middle" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                    Home
+                </button>
+                <button data-section="profile" class="nav-link w-full text-left p-3 rounded-lg font-medium transition duration-150">
+                    <svg class="w-5 h-5 inline-block mr-3 align-middle" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    Profile
+                </button>
+                <button data-section="stats" class="nav-link w-full text-left p-3 rounded-lg font-medium transition duration-150">
+                    <svg class="w-5 h-5 inline-block mr-3 align-middle" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
+                    Statistics
+                </button>
+                <button data-section="matches" class="nav-link w-full text-left p-3 rounded-lg font-medium transition duration-150">
+                    <svg class="w-5 h-5 inline-block mr-3 align-middle" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v4a1 1 0 001 1h3m-3-4h4m-3 4h3m4-4v4a1 1 0 01-1 1h-3m3-4h-4"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 18h2a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2m-2 4h10a2 2 0 002-2v-2"></path></svg>
+                    Matches
+                </button>
+            </nav>
+            <div class="mt-8 p-4 rounded-lg border-2" id="achievements-summary">
+                <h3 class="font-bold mb-3 text-xl">Achievements</h3>
+                <div id="achievement-list-summary" class="space-y-2 text-sm">
+                    <!-- Achievements loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area: Switches views based on navigation -->
+        <div id="main-content" class="main-content p-4 lg:p-8 flex flex-col items-center">
+            
+            <!-- 1. Home Page View (Game Setup) -->
+            <div id="home-view" class="w-full max-w-lg space-y-6 section-view">
+                <h2 class="text-4xl font-black text-center mb-8">Game Setup</h2>
+                
+                <!-- Current Game Mode Summary -->
+                <div id="home-mode-summary" class="p-5 rounded-xl shadow-lg border-2 text-center">
+                    <h3 class="text-2xl font-bold mb-2">Selected Mode</h3>
+                    <p class="text-lg mb-1">Mode: <span id="home-opponent" class="font-semibold">Player vs. Player</span></p>
+                    <p class="text-lg mb-1">Board: <span id="home-board-size" class="font-semibold">3 x 3</span></p>
+                    <p class="text-lg">Win: <span id="home-win-length" class="font-semibold">3 in a row</span></p>
+                </div>
+
+                <!-- Game Settings Section -->
+                <div id="game-settings-home" class="p-4 rounded-lg border-2">
+                    <h3 class="text-xl font-bold mb-4">Game Settings</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="game-mode" class="block text-sm font-medium mb-1">Select Opponent</label>
+                            <select id="game-mode" class="w-full p-3 border rounded-lg focus:ring-4 focus:ring-opacity-50 transition-shadow duration-150">
+                                <option value="PVP">Player vs. Player (Local)</option>
+                                <option value="PVA_EASY">vs. AI (Easy - Random)</option>
+                                <option value="PVA_HARD">vs. AI (Hard - Minimax)</option>
+                            </select>
+                        </div>
+
+                        <!-- Local Player Names (Show only for PVP) -->
+                        <div id="local-player-names" class="grid grid-cols-2 gap-4 hidden">
+                            <div>
+                                <label for="player-x-name" class="block text-sm font-medium mb-1">Player 1 (X) Name</label>
+                                <input type="text" id="player-x-name" class="w-full p-2 border rounded-lg focus:ring-2" maxlength="15" value="Player 1">
+                            </div>
+                            <div>
+                                <label for="player-o-name" class="block text-sm font-medium mb-1">Player 2 (O) Name</label>
+                                <input type="text" id="player-o-name" class="w-full p-2 border rounded-lg focus:ring-2" maxlength="15" value="Player 2">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="grid-size" class="block text-sm font-medium mb-1">Grid Size (N x N)</label>
+                            <select id="grid-size" class="w-full p-3 border rounded-lg focus:ring-4 focus:ring-opacity-50 transition-shadow duration-150">
+                                <option value="3">3 x 3 (Classic)</option>
+                                <option value="4">4 x 4</option>
+                                <option value="5">5 x 5 (Max Size)</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">Note: AI performance may slow on 5x5.</p>
+                        </div>
+                        <div>
+                            <label for="win-length" class="block text-sm font-medium mb-1">Connect N to Win</label>
+                            <select id="win-length" class="w-full p-3 border rounded-lg focus:ring-4 focus:ring-opacity-50 transition-shadow duration-150">
+                                <!-- Options populated dynamically by JS -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="start-game-btn" class="w-full px-8 py-4 rounded-xl shadow-xl font-black text-xl transition duration-200 transform hover:scale-[1.01] active:scale-[0.99]">
+                    Start Game
+                </button>
+            </div>
+
+            <!-- 2. Profile View -->
+            <div id="profile-view" class="w-full max-w-lg space-y-6 section-view hidden">
+                <h2 class="text-4xl font-black text-center mb-8">Profile Settings</h2>
+                
+                <!-- Profile Image and Details -->
+                <div class="p-4 rounded-lg border-2 space-y-4" id="user-info-card">
+                    <h3 class="text-xl font-bold mb-4 flex justify-between items-center">
+                        <span>Your Profile Details</span>
+                        <button id="save-profile-btn" class="px-3 py-1 text-sm rounded-lg font-medium transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Save
+                        </button>
+                    </h3>
+
+                    <!-- Profile Photo Upload -->
+                    <div class="flex flex-col items-center pb-4 border-b">
+                        <img id="profile-photo-preview" class="w-24 h-24 rounded-full object-cover border-4" src="https://placehold.co/96x96/6366f1/ffffff?text=P" alt="Profile Photo">
+                        <label for="profile-photo-input" class="cursor-pointer mt-3 px-3 py-1 text-sm rounded-lg font-medium transition duration-200">
+                            Upload Photo
+                        </label>
+                        <input type="file" id="profile-photo-input" accept="image/*" class="hidden">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Personal Info -->
+                        <div>
+                            <label for="nickname" class="block text-sm font-medium mb-1">Nickname</label>
+                            <input type="text" id="nickname" class="w-full p-2 border rounded-lg focus:ring-2" maxlength="15">
+                        </div>
+                        <div>
+                            <label for="fullname" class="block text-sm font-medium mb-1">Full Name</label>
+                            <input type="text" id="fullname" class="w-full p-2 border rounded-lg focus:ring-2">
+                        </div>
+                        <div>
+                            <label for="dob" class="block text-sm font-medium mb-1">Date of Birth</label>
+                            <input type="date" id="dob" class="w-full p-2 border rounded-lg focus:ring-2">
+                        </div>
+                        <div>
+                            <label for="gender" class="block text-sm font-medium mb-1">Gender</label>
+                            <select id="gender" class="w-full p-2 border rounded-lg focus:ring-2">
+                                <option value="Not Specified">Not Specified</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-span-2">
+                            <label for="occupation" class="block text-sm font-medium mb-1">Occupation</label>
+                            <input type="text" id="occupation" class="w-full p-2 border rounded-lg focus:ring-2">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Premium Status Section (NEW) -->
+                <div class="p-4 rounded-lg border-2 space-y-4">
+                    <h3 class="text-xl font-bold mb-2 flex justify-between items-center">
+                        <span>Premium Features</span>
+                        <span id="premium-status" class="px-3 py-1 text-xs font-bold rounded-full">STANDARD</span>
+                    </h3>
+                    <p class="text-sm text-gray-500">
+                        Premium allows unlimited moves to be undone, even against the AI!
+                    </p>
+                    <button id="toggle-premium-btn" class="w-full px-4 py-2 rounded-lg font-semibold transition-colors transform hover:scale-[1.01] active:scale-[0.99]"></button>
+                </div>
+                <!-- End Premium Status Section -->
+
+                <!-- Theme & Symbol Settings -->
+                <div class="p-4 rounded-lg border-2 space-y-4">
+                    <h3 class="text-xl font-bold mb-2">Game Aesthetics</h3>
+                    <div>
+                        <label for="player-symbol" class="block text-sm font-medium mb-1">Your Symbol</label>
+                        <select id="player-symbol" class="w-full p-2 border rounded-lg focus:ring-2">
+                            <option value="X">X</option>
+                            <option value="O">O</option>
+                            <option value="★">★</option>
+                            <option value="◇">◇</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="theme-selector" class="block text-sm font-medium mb-1">Theme</label>
+                        <select id="theme-selector" class="w-full p-2 border rounded-lg focus:ring-2">
+                            <option value="dark">Dark Mode (Classic)</option>
+                            <option value="retro">Retro Arcade (Green/Yellow)</option>
+                            <option value="ocean">Ocean Blue (Teal/Cyan)</option>
+                            <option value="love">Love (Pink/Red)</option>
+                            <option value="panda">Panda (Black/White/Bamboo)</option>
+                        </select>
+                    </div>
+                    <p class="text-xs text-gray-500">User ID: <span id="display-user-id">Loading...</span></p>
+                </div>
+            </div>
+
+            <!-- 3. Statistics View -->
+            <div id="stats-view" class="w-full max-w-lg space-y-6 section-view hidden">
+                <h2 class="text-4xl font-black text-center mb-8">Lifetime Statistics</h2>
+                <div class="p-6 rounded-xl border-2 shadow-lg">
+                    <h3 class="text-2xl font-bold mb-6 text-center">Overall Record</h3>
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div id="stat-wins">
+                            <p class="text-5xl font-extrabold text-green-500">0</p>
+                            <p class="text-md font-medium mt-1">Wins</p>
+                        </div>
+                        <div id="stat-losses">
+                            <p class="text-5xl font-extrabold text-red-500">0</p>
+                            <p class="text-md font-medium mt-1">Losses</p>
+                        </div>
+                        <div id="stat-draws">
+                            <p class="text-5xl font-extrabold text-yellow-500">0</p>
+                            <p class="text-md font-medium mt-1">Draws</p>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-center text-sm text-gray-500">Stats are saved automatically to your profile.</p>
+            </div>
+            
+            <!-- 4. Recent Matches View -->
+            <div id="matches-view" class="w-full max-w-lg space-y-6 section-view hidden">
+                <h2 class="text-4xl font-black text-center mb-8">Recent Matches</h2>
+                <div id="match-list" class="space-y-3">
+                    <p id="no-matches-msg" class="text-center text-lg text-gray-500">No recent matches played.</p>
+                    <!-- Match cards will be inserted here by JS -->
+                </div>
+            </div>
+
+            <!-- 5. Game Board View (Always Hidden until 'Start Game') -->
+            <div id="game-view" class="w-full flex flex-col items-center justify-center space-y-6 section-view hidden">
+                <div id="game-info" class="w-full max-w-lg text-center p-4 rounded-lg shadow-xl font-bold text-xl lg:text-2xl transition-all duration-300">
+                    <!-- Turn/Status message goes here -->
+                </div>
+
+                <!-- The board container's styling is crucial for responsiveness -->
+                <div id="board-container" class="w-full max-w-lg aspect-square shadow-2xl rounded-xl border-4 p-2 transition-colors duration-500">
+                    <!-- The board-grid class will have its CSS properties defined inline by JS -->
+                    <div id="board" class="h-full w-full grid gap-2">
+                        <!-- Grid cells are generated here -->
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap justify-center gap-3 w-full max-w-lg">
+                    <!-- Premium Undo Button (Updated HTML and ID) -->
+                    <button id="premium-undo-btn" class="sm:w-auto px-6 py-3 rounded-xl shadow-lg font-bold text-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed premium-button-style">
+                        <!-- Diamond icon SVG for Premium look -->
+                        <svg class="w-6 h-6 inline-block mr-2 text-gray-800" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L1 12h3l3 9h10l3-9h3L12 2zm0 3.82L15.3 9h-6.6L12 5.82zM6.9 11l-2.4 2.22 1.5 2.78 3-2.78V11H6.9zM17.1 11h-3.4v3.22l3 2.78 1.5-2.78L17.1 11zM11 16.22V19H13V16.22l-1-1-1 1z"/></svg>
+                        PREMIUM UNDO
+                    </button>
+                    <!-- Back to Home Button -->
+                    <button id="home-btn" class="sm:w-auto px-6 py-3 rounded-xl shadow-lg font-bold text-lg transition duration-200">
+                        <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.3 17c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        Exit Game
+                    </button>
+                </div>
+            </div>
+
+            <!-- Message Box for Alert replacement -->
+            <div id="message-box" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50">
+                <div class="p-6 rounded-xl shadow-2xl max-w-sm w-full transition-all duration-300" id="message-box-card">
+                    <h3 class="text-2xl font-bold mb-4" id="message-title">Game Over!</h3>
+                    <p class="mb-6 text-lg" id="message-text">It's a Draw.</p>
+                    <button id="close-message-btn" class="w-full px-4 py-2 rounded-lg font-semibold transition-colors transform hover:scale-[1.01] active:scale-[0.99]">
+                        Play Again
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Global Constants
+        const THEMES = {
+            retro: {
+                primary: 'bg-green-700 hover:bg-green-600', secondary: 'bg-yellow-500 hover:bg-yellow-400',
+                text: 'text-gray-900', bg: 'bg-green-50', accent: 'text-red-600',
+                cell_bg: 'bg-green-100', cell_border: 'border-green-300', nav_bg: 'bg-green-700', nav_hover: 'bg-green-600', nav_active: 'bg-yellow-500', // ENFORCED DARK NAV BG
+                achievement_unlocked: 'bg-yellow-400 text-gray-900', bg_class: 'bg-pattern-retro', accent_color_css: '#DC2626' // red-600
+            },
+            dark: {
+                primary: 'bg-blue-600 hover:bg-blue-500', secondary: 'bg-gray-700 hover:bg-gray-600',
+                text: 'text-white', bg: 'bg-gray-900', accent: 'text-yellow-400',
+                cell_bg: 'bg-gray-800', cell_border: 'border-gray-700', nav_bg: 'bg-gray-800', nav_hover: 'bg-gray-700', nav_active: 'bg-blue-600', // DARK NAV BG
+                achievement_unlocked: 'bg-yellow-400 text-gray-900', bg_class: 'bg-pattern-dark', accent_color_css: '#FBBF24' // yellow-400
+            },
+            ocean: {
+                primary: 'bg-teal-600 hover:bg-teal-500', secondary: 'bg-cyan-400 hover:bg-cyan-300',
+                text: 'text-gray-900', bg: 'bg-blue-100', accent: 'text-red-700',
+                cell_bg: 'bg-white', cell_border: 'border-teal-300', nav_bg: 'bg-teal-600', nav_hover: 'bg-teal-500', nav_active: 'bg-cyan-400', // ENFORCED DARK NAV BG
+                achievement_unlocked: 'bg-yellow-400 text-gray-900', bg_class: 'bg-pattern-ocean', accent_color_css: '#B91C1C' // red-700
+            },
+            love: { 
+                primary: 'bg-pink-600 hover:bg-pink-500', secondary: 'bg-red-400 hover:bg-red-300',
+                text: 'text-gray-900', bg: 'bg-pink-50', accent: 'text-red-800',
+                cell_bg: 'bg-white', cell_border: 'border-pink-300', nav_bg: 'bg-red-600', nav_hover: 'bg-red-500', nav_active: 'bg-pink-600', // ENFORCED DARK NAV BG
+                achievement_unlocked: 'bg-red-400 text-white', bg_class: 'bg-pattern-love', accent_color_css: '#991B1B' // red-800
+            },
+            panda: { 
+                primary: 'bg-black hover:bg-gray-800', secondary: 'bg-green-500 hover:bg-green-400',
+                text: 'text-gray-900', bg: 'bg-white', accent: 'text-green-600',
+                cell_bg: 'bg-gray-50', cell_border: 'border-gray-300', nav_bg: 'bg-gray-800', nav_hover: 'bg-gray-700', nav_active: 'bg-black', // ENFORCED DARK NAV BG
+                achievement_unlocked: 'bg-green-500 text-white', bg_class: 'bg-pattern-panda', accent_color_css: '#059669' // green-600
+            }
+        };
+
+        const ACHIEVEMENTS = [
+            { id: 'first_win', name: 'First Blood', description: 'Win your first game.', condition: (profile) => profile.stats.wins >= 1 },
+            { id: 'minimax_master', name: 'Minimax Master', description: 'Defeat the Hard AI (3x3).', condition: (profile) => profile.stats.ai_hard_wins >= 1 },
+            { id: 'grid_dominator', name: 'Grid Dominator', description: 'Win a 5x5 game (Connect 5).', condition: (profile) => profile.stats.five_in_a_row_wins >= 1 },
+            { id: 'century_player', name: 'Century Player', description: 'Play 100 total games.', condition: (profile) => profile.stats.wins + profile.stats.losses + profile.stats.draws >= 100 },
+        ];
+
+
+        // DOM Elements
+        const boardEl = document.getElementById('board');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const homeBtn = document.getElementById('home-btn');
+        const premiumUndoBtn = document.getElementById('premium-undo-btn'); 
+        const gameInfoEl = document.getElementById('game-info');
+        const messageBox = document.getElementById('message-box');
+        const messageTitle = document.getElementById('message-title');
+        const messageText = document.getElementById('message-text');
+        const closeMessageBtn = document.getElementById('close-message-btn');
+        const bodyContainer = document.getElementById('body-container');
+        const navSidebar = document.getElementById('main-nav-sidebar'); 
+        const toggleNavBtn = document.getElementById('toggle-nav-btn');
+        const navLinks = document.querySelectorAll('.nav-link');
+        const achievementSummaryEl = document.getElementById('achievement-list-summary');
+        const messageBoxCard = document.getElementById('message-box-card');
+
+        // LOADING ELEMENTS (Will be hidden instantly)
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const loadingText = document.getElementById('loading-text');
+
+        // View Containers
+        const views = {
+            home: document.getElementById('home-view'),
+            profile: document.getElementById('profile-view'),
+            stats: document.getElementById('stats-view'),
+            matches: document.getElementById('matches-view'),
+            game: document.getElementById('game-view')
+        };
+        
+        // Home View DOM Elements
+        const homeOpponent = document.getElementById('home-opponent');
+        const homeBoardSize = document.getElementById('home-board-size');
+        const homeWinLength = document.getElementById('home-win-length');
+        const gameSettingsHome = document.getElementById('game-settings-home');
+        const localPlayerNamesDiv = document.getElementById('local-player-names'); 
+        const playerXNameInput = document.getElementById('player-x-name');        
+        const playerONameInput = document.getElementById('player-o-name');        
+
+
+        // Profile View DOM Elements
+        const nicknameInput = document.getElementById('nickname');
+        const fullnameInput = document.getElementById('fullname'); 
+        const dobInput = document.getElementById('dob');           
+        const genderSelector = document.getElementById('gender');   
+        const occupationInput = document.getElementById('occupation');
+        const profilePhotoPreview = document.getElementById('profile-photo-preview'); 
+        const profilePhotoInput = document.getElementById('profile-photo-input');     
+        const symbolSelector = document.getElementById('player-symbol');
+        const themeSelector = document.getElementById('theme-selector');
+        const saveProfileBtn = document.getElementById('save-profile-btn');
+        const displayUserId = document.getElementById('display-user-id');
+        const userInfoCard = document.getElementById('user-info-card');
+        const premiumStatusEl = document.getElementById('premium-status');         
+        const togglePremiumBtn = document.getElementById('toggle-premium-btn');     
+
+        // Settings DOM Elements
+        const gameModeSelector = document.getElementById('game-mode');
+        const gridSizeSelector = document.getElementById('grid-size');
+        const winLengthSelector = document.getElementById('win-length');
+
+        // Stats View DOM Elements
+        const statWinsEl = document.getElementById('stat-wins');
+        const statLossesEl = document.getElementById('stat-losses');
+        const statDrawsEl = document.getElementById('stat-draws');
+        
+        // Matches View DOM Elements
+        const matchListEl = document.getElementById('match-list');
+        const noMatchesMsg = document.getElementById('no-matches-msg');
+
+
+        // Game State
+        let board = [];
+        let internalCurrentPlayer = 'X';
+        let isGameActive = true;
+        let winningCombo = null;
+        let currentTheme = THEMES.dark;
+        let currentSection = 'home'; 
+        let moveHistory = [];
+        let playerNames = { 'X': 'Player 1', 'O': 'Player 2' }; // Stores names for current game
+        let isAppReady = false; // Flag to control loading overlay
+
+        // User and Data State
+        const DEFAULT_PROFILE = {
+            nickname: 'Player',
+            fullname: '', 
+            dob: '',      
+            gender: 'Not Specified', 
+            occupation: '', 
+            photo: '', 
+            symbol: 'X',
+            theme: 'dark',
+            isPremium: false, 
+            stats: { 
+                wins: 0, 
+                losses: 0, 
+                draws: 0,
+                ai_hard_wins: 0, 
+                five_in_a_row_wins: 0 
+            },
+            achievements: {}, 
+            recentMatches: [], 
+            gameMode: 'PVP',
+            gridSize: 3,
+            winLength: 3,
+            p1Name: 'Player 1', 
+            p2Name: 'Player 2',
+        };
+        let userProfile = { ...DEFAULT_PROFILE };
+        
+        // Using a static ID since there is no server authentication
+        let userId = 'local_user_profile'; 
+
+
+        // --- LOCAL STORAGE INITIALIZATION AND PROFILE DATA ---
+
+        function hideLoadingOverlay() {
+            if (isAppReady) return; 
+            loadingOverlay.style.opacity = '0';
+            // Use a slight timeout to ensure CSS transition completes
+            setTimeout(() => {
+                loadingOverlay.style.display = 'none';
+            }, 500); 
+            isAppReady = true;
+        }
+        
+        /**
+         * Loads user profile from localStorage immediately.
+         */
+        function loadProfileFromLocalStorage() {
+            try {
+                // Attempt to load profile from localStorage
+                const storedProfile = localStorage.getItem('tictactoe_profile');
+                if (storedProfile) {
+                    const fetchedData = JSON.parse(storedProfile);
+                    // Merge fetched data with defaults to ensure all keys exist
+                    const fetchedProfile = {
+                        ...DEFAULT_PROFILE,
+                        ...fetchedData,
+                        stats: { ...DEFAULT_PROFILE.stats, ...fetchedData.stats },
+                        achievements: { ...DEFAULT_PROFILE.achievements, ...fetchedData.achievements },
+                        recentMatches: Array.isArray(fetchedData.recentMatches) ? fetchedData.recentMatches : DEFAULT_PROFILE.recentMatches,
+                    };
+                    userProfile = fetchedProfile;
+                } else {
+                    // If no stored profile, save the default one
+                    saveProfile(userProfile);
+                }
+                
+                // Apply the profile immediately regardless of source
+                applyUserProfile(userProfile);
+                checkAndUnlockAchievements();
+                
+                // Update UI details
+                displayUserId.textContent = userId;
+                
+            } catch (error) {
+                console.error("Error loading or parsing profile from LocalStorage:", error);
+                // Fallback to defaults and display error if unable to use storage
+                applyUserProfile(userProfile);
+                displayUserId.textContent = 'LOCAL_ERROR';
+            }
+            
+            // Immediately hide the loading overlay since storage access is synchronous
+            hideLoadingOverlay();
+        }
+
+        /**
+         * Saves user profile synchronously to localStorage.
+         */
+        function saveProfile(profileData) {
+            // saveProfileBtn.disabled = true; // Disabled initially in applyUserProfile
+            saveProfileBtn.textContent = 'Saving...';
+            
+            try {
+                // Keep only the last 10 matches
+                if (profileData.recentMatches.length > 10) {
+                    profileData.recentMatches = profileData.recentMatches.slice(-10);
+                }
+                
+                localStorage.setItem('tictactoe_profile', JSON.stringify(profileData));
+            } catch (error) {
+                console.error("Error saving profile to LocalStorage:", error);
+            } finally {
+                saveProfileBtn.textContent = 'Saved!';
+                setTimeout(() => {
+                    saveProfileBtn.textContent = 'Save';
+                    // Re-enable the save button after saving completes
+                    updateProfileFromUI(); 
+                }, 1500);
+            }
+        }
+        
+        function updateWinLengthOptions(size) {
+            winLengthSelector.innerHTML = '';
+            size = parseInt(size);
+
+            for (let i = 3; i <= size; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `${i} in a row`;
+                winLengthSelector.appendChild(option);
+            }
+
+            if (userProfile.winLength > size || userProfile.winLength < 3) {
+                userProfile.winLength = 3;
+            }
+            winLengthSelector.value = userProfile.winLength;
+        }
+
+        function getModeDescription(mode) {
+            switch(mode) {
+                case 'PVP': return 'Local Multiplayer';
+                case 'PVA_EASY': return 'vs. AI (Easy)';
+                case 'PVA_HARD': return 'vs. AI (Hard / Minimax)';
+                default: return 'Unknown';
+            }
+        }
+
+        function applyUserProfile(profile) {
+            // UI Inputs (Personal Info)
+            nicknameInput.value = profile.nickname || 'Player';
+            fullnameInput.value = profile.fullname || '';
+            dobInput.value = profile.dob || '';
+            genderSelector.value = profile.gender || 'Not Specified';
+            occupationInput.value = profile.occupation || '';
+            profilePhotoPreview.src = profile.photo || "https://placehold.co/96x96/6366f1/ffffff?text=P";
+
+            // UI Inputs (Aesthetics)
+            symbolSelector.value = profile.symbol || 'X';
+            themeSelector.value = profile.theme || 'dark';
+            gameModeSelector.value = profile.gameMode || 'PVP';
+            gridSizeSelector.value = profile.gridSize || 3;
+            updateWinLengthOptions(profile.gridSize || 3);
+            winLengthSelector.value = profile.winLength || 3;
+            
+            // Local PVP Player Names
+            playerXNameInput.value = profile.p1Name || 'Player 1';
+            playerONameInput.value = profile.p2Name || 'Player 2';
+            
+            if (profile.gameMode === 'PVP') {
+                localPlayerNamesDiv.classList.remove('hidden');
+                playerNames = { 'X': profile.p1Name, 'O': profile.p2Name };
+            } else {
+                localPlayerNamesDiv.classList.add('hidden');
+                // Use default names/AI names for non-PVP modes
+                playerNames = { 'X': profile.nickname, 'O': 'AI' }; 
+            }
+
+            // Theme Application
+            currentTheme = THEMES[profile.theme] || THEMES.dark;
+            applyTheme(currentTheme);
+            
+            // Re-run setSection to apply correct theme/nav highlighting
+            // NOTE: setSection is called in window.onload before applyUserProfile, so this ensures theme/state is consistent
+            // setSection(currentSection); 
+
+            // Home Summary Update
+            homeBoardSize.textContent = `${profile.gridSize} x ${profile.gridSize}`;
+            homeWinLength.textContent = `${profile.winLength} in a row`;
+            homeOpponent.textContent = getModeDescription(profile.gameMode);
+
+            // Stats Display
+            statWinsEl.querySelector('p').textContent = profile.stats.wins;
+            statLossesEl.querySelector('p').textContent = profile.stats.losses;
+            statDrawsEl.querySelector('p').textContent = profile.stats.draws;
+            
+            // Matches Display
+            renderRecentMatches(profile.recentMatches);
+
+            // Achievements Display
+            renderAchievementsSummary(profile.achievements);
+            
+            // Premium Status Display (NEW)
+            renderPremiumStatus(profile.isPremium);
+            
+            // Disable save button initially as data should match profile
+            saveProfileBtn.disabled = true;
+        }
+        
+        function renderPremiumStatus(isPremium) {
+            premiumStatusEl.textContent = isPremium ? 'PREMIUM' : 'STANDARD';
+            premiumStatusEl.className = premiumStatusEl.className.replace(/bg-[a-z]+-\d+|text-[a-z]+-\d+|bg-gray-200|text-gray-900/g, '').trim();
+
+            if (isPremium) {
+                premiumStatusEl.classList.add('bg-yellow-400', 'text-gray-900');
+                togglePremiumBtn.textContent = 'Deactivate Premium';
+                togglePremiumBtn.classList.add(...(currentTheme.secondary).split(' '));
+                togglePremiumBtn.classList.remove(...(currentTheme.primary).split(' '));
+                
+            } else {
+                premiumStatusEl.classList.add('bg-gray-200', 'text-gray-900');
+                togglePremiumBtn.textContent = 'Activate Premium Trial';
+                // Add back the primary theme classes for the activation button
+                togglePremiumBtn.classList.add(...(currentTheme.primary).split(' '));
+                togglePremiumBtn.classList.remove(...(currentTheme.secondary).split(' '));
+            }
+            togglePremiumBtn.classList.add('text-white');
+        }
+
+        function togglePremium() {
+            userProfile.isPremium = !userProfile.isPremium;
+            renderPremiumStatus(userProfile.isPremium);
+            saveProfile(userProfile);
+        }
+
+        function applyTheme(theme) {
+            // Apply main background and text colors + theme class for backgrounds
+            const themeClasses = theme.bg_class || '';
+            bodyContainer.className = `min-h-screen transition-colors duration-500 ${theme.bg} ${theme.text} ${themeClasses}`;
+            
+            // Set CSS variable for winning cell animation
+            document.documentElement.style.setProperty('--accent-color', theme.accent_color_css);
+            
+            // NEW: Set CSS variables for loading screen
+            // Attempt to resolve Tailwind color to a basic color for spinner/text
+            let primaryColorHex = '#3B82F6'; // Default Blue-500
+            if (theme.primary.includes('blue-600')) primaryColorHex = '#2563EB';
+            else if (theme.primary.includes('teal-600')) primaryColorHex = '#0D9488';
+            else if (theme.primary.includes('green-700')) primaryColorHex = '#047857';
+            else if (theme.primary.includes('pink-600')) primaryColorHex = '#EC4899';
+            else if (theme.primary.includes('black')) primaryColorHex = '#000000';
+
+
+            const loadingColor = primaryColorHex;
+            const loadingBg = theme.bg === 'bg-gray-900' ? 'rgba(0, 0, 0, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+            document.documentElement.style.setProperty('--loading-color', loadingColor);
+            document.documentElement.style.setProperty('--loading-bg', loadingBg);
+
+
+            // Apply card colors to sections
+            const cardElements = [userInfoCard, gameSettingsHome, messageBoxCard, ...document.querySelectorAll('#stats-view > div, #matches-view > div'), ...document.querySelectorAll('#profile-view > div')];
+
+            cardElements.forEach(el => {
+                if (el) {
+                    // Remove old theme classes before applying new ones
+                    el.className = el.className.replace(/bg-[a-z]+-\d+|border-[a-z]+-\d+|dark:bg-[a-z]+-\d+/g, '').trim() + ` ${theme.cell_bg} border-2 ${theme.cell_border}`;
+                }
+            });
+
+            // Apply Navigation Sidebar theme
+            // The nav_bg is now enforced to be dark to ensure white text/icons work
+            navSidebar.className = navSidebar.className.replace(/bg-[a-z]+-\d+|border-[a-z]+-\d+/g, '').trim() + ` ${theme.nav_bg}`;
+            
+            // Determine text color based on background luminance (simple rule: light backgrounds get dark text)
+            const isLightBackground = theme.bg.includes('white') || theme.bg.includes('50') || theme.bg.includes('100') || theme.bg.includes('200') || theme.bg.includes('300');
+            const mobileHeaderTextColor = isLightBackground ? 'text-gray-900' : 'text-white';
+            const buttonTextColor = isLightBackground ? 'text-gray-900' : 'text-white';
+            
+            // Apply Mobile Header (Title and Burger Icon background)
+            const mobileHeader = document.getElementById('mobile-header');
+            if (mobileHeader) {
+                mobileHeader.className = mobileHeader.className.replace(/bg-[a-z]+-\d+|text-[a-z]+-\d+|text-white|text-gray-900/g, '').trim() + ` ${theme.bg} ${mobileHeaderTextColor}`;
+                
+                // Adjust mobile header button color (Burger Icon/SVG stroke)
+                const toggleSvg = toggleNavBtn.querySelector('svg');
+                if (toggleSvg) {
+                    toggleSvg.setAttribute('stroke', isLightBackground ? 'currentColor' : 'white');
+                    toggleSvg.classList.remove('text-gray-900', 'text-white');
+                    toggleSvg.classList.add(mobileHeaderTextColor);
+                }
+            }
+            
+            // Apply Save Profile button text color
+            if (saveProfileBtn) {
+                saveProfileBtn.className = saveProfileBtn.className.replace(/text-[a-z]+-\d+/g, '').trim() + ` ${buttonTextColor}`;
+            }
+
+            // Apply Nav Link styles
+            navLinks.forEach(link => {
+                const isActive = link.dataset.section === currentSection;
+                
+                // *** UNIVERSAL CONTRAST FIX: Set text/icon to white regardless of theme's primary text color ***
+                const linkTextColor = 'text-white'; 
+                const iconStrokeColor = 'white'; 
+                
+                link.querySelectorAll('svg').forEach(svg => {
+                    svg.setAttribute('stroke', iconStrokeColor); 
+                    // Remove old Tailwind color classes and apply the new one for visual consistency
+                    svg.classList.remove('text-gray-900', 'text-white'); 
+                    svg.classList.add(linkTextColor);
+                });
+
+                // 1. Clean previous styles
+                link.className = link.className.replace(/bg-[a-z]+-\d+|text-[a-z]+-\d+|hover:bg-[a-z]+-\d+|text-[a-z]+-\d+/g, '').trim();
+
+                // 2. Apply new styles
+                if (isActive) {
+                    // Active state uses the accent color for background
+                    link.classList.add(...(theme.nav_active).split(' '), linkTextColor);
+                } else {
+                    // Inactive state uses the sidebar background color for contrast
+                    link.classList.add(theme.nav_bg, linkTextColor); 
+                    link.classList.add(...(theme.nav_hover).split(' ').map(cls => `hover:${cls}`));
+                }
+            });
+
+            // Apply standard button styles (excluding the premium button)
+            [startGameBtn, homeBtn, profilePhotoInput.previousElementSibling].forEach(btn => {
+                // We handle saveProfileBtn separately above
+                if (btn && btn.id !== 'save-profile-btn') {
+                    btn.className = btn.className.replace(/bg-[a-z]+-\d+|text-[a-z]+-\d+|hover:bg-[a-z]+-\d+|shadow-md/g, '').trim() + ` ${theme.primary} text-white shadow-md transition duration-200 transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed`;
+                }
+            });
+            
+            // Apply close message button style
+            if (closeMessageBtn) {
+                 closeMessageBtn.className = closeMessageBtn.className.replace(/bg-[a-z]+-\d+|text-[a-z]+-\d+|hover:bg-[a-z]+-\d+/g, '').trim() + ` ${theme.primary} text-white transition-colors transform hover:scale-[1.01] active:scale-[0.99]`;
+            }
+            
+            // Re-render Premium button state to ensure colors are correct
+            if (currentSection === 'profile') {
+                renderPremiumStatus(userProfile.isPremium);
+            }
+            
+            // Apply game info bar color
+            document.querySelectorAll('#game-info').forEach(el => {
+                 let infoTextColor = 'text-white';
+                 if (theme.secondary.includes('yellow') || theme.secondary.includes('cyan') || theme.secondary.includes('red-400')) {
+                    infoTextColor = 'text-gray-900';
+                 }
+                 
+                 el.className = el.className.replace(/bg-[a-z]+-\d+|text-[a-z]+-\d+/g, '').trim() + ` ${currentTheme.secondary} ${infoTextColor} shadow-xl`;
+            });
+            
+            // --- FIX: Form Input/Select Contrast ---
+            const formElements = document.querySelectorAll('input[type="text"], input[type="date"], select');
+            
+            // Check if the overall theme is dark (based on body background)
+            if (theme.bg === 'bg-gray-900') { 
+                 // Force dark background inputs with white text for better integration
+                 formElements.forEach(el => {
+                    // Clean up existing background/text classes
+                    el.classList.remove('bg-white', 'text-gray-900', 'bg-gray-100', 'text-white', 'bg-gray-700', 'border-gray-300');
+                    // Apply dark mode input styling
+                    el.classList.add('bg-gray-700', 'text-white', 'border-gray-600'); 
+                });
+            } else {
+                 // Force light background inputs with dark text for contrast
+                 formElements.forEach(el => {
+                    // Clean up existing background/text classes
+                    el.classList.remove('bg-gray-700', 'text-white', 'bg-gray-100', 'border-gray-600');
+                    // Apply light mode input styling
+                    el.classList.add('bg-white', 'text-gray-900', 'border-gray-300'); 
+                });
+            }
+
+
+            if (currentSection === 'game') renderBoard();
+        }
+
+        function updateProfileFromUI() {
+            const newProfile = {
+                nickname: nicknameInput.value.trim() || 'Player',
+                fullname: fullnameInput.value.trim(),
+                dob: dobInput.value,
+                gender: genderSelector.value,
+                occupation: occupationInput.value.trim(),
+                symbol: symbolSelector.value,
+                theme: themeSelector.value,
+                gameMode: gameModeSelector.value,
+                gridSize: parseInt(gridSizeSelector.value),
+                winLength: parseInt(winLengthSelector.value),
+                p1Name: playerXNameInput.value.trim() || 'Player 1',
+                p2Name: playerONameInput.value.trim() || 'Player 2',
+            };
+
+            const isChanged = (
+                userProfile.nickname !== newProfile.nickname ||
+                userProfile.fullname !== newProfile.fullname ||
+                userProfile.dob !== newProfile.dob ||
+                userProfile.gender !== newProfile.gender ||
+                userProfile.occupation !== newProfile.occupation ||
+                userProfile.symbol !== newProfile.symbol ||
+                userProfile.theme !== newProfile.theme ||
+                userProfile.gameMode !== newProfile.gameMode ||
+                userProfile.gridSize !== newProfile.gridSize ||
+                userProfile.winLength !== newProfile.winLength ||
+                userProfile.p1Name !== newProfile.p1Name ||
+                userProfile.p2Name !== newProfile.p2Name
+            );
+
+            saveProfileBtn.disabled = !isChanged;
+            
+            if (userProfile.gridSize !== newProfile.gridSize) {
+                updateWinLengthOptions(newProfile.gridSize);
+                newProfile.winLength = parseInt(winLengthSelector.value); 
+            }
+            
+            // Show/Hide PVP names input
+            if (newProfile.gameMode === 'PVP') {
+                localPlayerNamesDiv.classList.remove('hidden');
+            } else {
+                localPlayerNamesDiv.classList.add('hidden');
+            }
+
+
+            if (isChanged) {
+                userProfile = { ...userProfile, ...newProfile };
+                applyUserProfile(userProfile);
+            }
+        }
+
+        function updateStats(result, matchData) {
+            userProfile.stats[result] += 1;
+            
+            // Check for specific AI/Grid wins to update dedicated stats
+            if (matchData.mode === 'PVA_HARD' && result === 'wins') {
+                 userProfile.stats.ai_hard_wins += 1;
+            }
+            if (matchData.size === 5 && matchData.winLength === 5 && result === 'wins') {
+                 userProfile.stats.five_in_a_row_wins += 1;
+            }
+
+            // Add match to recentMatches history
+            userProfile.recentMatches.push(matchData);
+
+            // Check achievements and unlock if condition met
+            checkAndUnlockAchievements();
+
+            applyUserProfile(userProfile);
+            saveProfile(userProfile); // Save stats immediately
+        }
+        
+        // --- ACHIEVEMENTS SYSTEM ---
+        function checkAndUnlockAchievements() {
+            let unlockedCount = 0;
+            let needsSave = false;
+            
+            ACHIEVEMENTS.forEach(ach => {
+                const isUnlocked = ach.condition(userProfile);
+                if (isUnlocked && !userProfile.achievements[ach.id]) {
+                    userProfile.achievements[ach.id] = new Date().toISOString();
+                    needsSave = true;
+                }
+                if (userProfile.achievements[ach.id]) {
+                    unlockedCount++;
+                }
+            });
+
+            if (needsSave) {
+                saveProfile(userProfile);
+            }
+            
+            renderAchievementsSummary(userProfile.achievements);
+            return unlockedCount;
+        }
+
+        function renderAchievementsSummary(achievements) {
+            achievementSummaryEl.innerHTML = '';
+            const unlockedCount = Object.keys(achievements).length;
+
+            if (unlockedCount === 0) {
+                achievementSummaryEl.innerHTML = '<p class="text-sm text-gray-500">Play to unlock achievements!</p>';
+                return;
+            }
+
+            ACHIEVEMENTS.forEach(ach => {
+                const isUnlocked = achievements[ach.id];
+                const achEl = document.createElement('div');
+                achEl.className = `p-2 rounded-lg transition-colors duration-200 ${isUnlocked ? currentTheme.achievement_unlocked : currentTheme.cell_bg}`;
+                
+                let dateText = isUnlocked ? new Date(isUnlocked).toLocaleDateString() : 'Locked';
+
+                achEl.innerHTML = `
+                    <p class="font-bold text-sm">${ach.name}</p>
+                    <p class="text-xs ${isUnlocked ? '' : 'text-gray-500'}">${isUnlocked ? `Unlocked: ${dateText}` : ach.description}</p>
+                `;
+                achievementSummaryEl.appendChild(achEl);
+            });
+        }
+
+
+        function renderRecentMatches(matches) {
+            matchListEl.innerHTML = '';
+
+            if (matches.length === 0) {
+                noMatchesMsg.classList.remove('hidden');
+                matchListEl.appendChild(noMatchesMsg);
+                return;
+            }
+            noMatchesMsg.classList.add('hidden');
+
+            matches.slice().reverse().forEach((match, index) => {
+                let statusClass = 'bg-gray-100 text-gray-900';
+                let statusText = 'Draw';
+                if (match.result === 'wins') {
+                    statusClass = 'bg-green-500 text-white';
+                    statusText = 'VICTORY';
+                } else if (match.result === 'losses') {
+                    statusClass = 'bg-red-500 text-white';
+                    statusText = 'DEFEAT';
+                }
+
+                const matchCard = document.createElement('div');
+                matchCard.className = `p-4 rounded-xl shadow-md flex justify-between items-center transition-colors duration-200 ${currentTheme.cell_bg}`;
+                matchCard.innerHTML = `
+                    <div>
+                        <p class="font-bold text-lg">${getModeDescription(match.mode)}</p>
+                        <p class="text-sm text-gray-500">${match.size}x${match.size} | Connect ${match.winLength}</p>
+                        <p class="text-xs text-gray-400 mt-1">${new Date(match.timestamp).toLocaleDateString()} ${new Date(match.timestamp).toLocaleTimeString()}</p>
+                    </div>
+                    <span class="px-3 py-1 text-sm font-bold rounded-full ${statusClass}">
+                        ${statusText}
+                    </span>
+                `;
+                matchListEl.appendChild(matchCard);
+            });
+        }
+
+
+        // --- AUDIO FEEDBACK ---
+
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playAudio(freq, duration, volume) {
+            if (!audioContext) return;
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        // --- CORE GAME LOGIC (DYNAMIC GRID & MINIMAX) ---
+
+        function checkWin(currentBoard) {
+            const size = userProfile.gridSize;
+            const k = userProfile.winLength;
+            const maxIndex = size * size;
+
+            if (currentBoard.length !== maxIndex) return null;
+
+            function checkLine(startIdx, direction) {
+                const symbol = currentBoard[startIdx];
+                if (!symbol) return null;
+
+                let combo = [startIdx];
+                const startRow = Math.floor(startIdx / size);
+                const startCol = startIdx % size;
+
+                for (let i = 1; i < k; i++) {
+                    const nextIdx = startIdx + i * direction;
+
+                    if (nextIdx < 0 || nextIdx >= maxIndex) return null;
+
+                    const nextRow = Math.floor(nextIdx / size);
+                    const nextCol = startIdx % size;
+                    
+                    // Boundary checks (prevents wrapping around rows/columns)
+                    if (direction === 1 && nextRow !== startRow) return null; // Horizontal
+                    if (direction === size + 1 && (nextRow !== startRow + i || nextCol !== startCol + i)) return null; // Diagonal Down-Right
+                    if (direction === size - 1 && (nextRow !== startRow + i || nextCol !== startCol - i)) return null; // Diagonal Down-Left
+
+                    if (currentBoard[nextIdx] === symbol) {
+                        combo.push(nextIdx);
+                    } else {
+                        return null;
+                    }
+                }
+                if (combo.length === k) return { symbol: symbol, combo: combo };
+                return null;
+            }
+
+            // Directions to check from left-to-right/top-to-bottom: Horizontal (1), Vertical (size), Diagonal Down-Right (size+1), Diagonal Down-Left (size-1)
+            const directions = [1, size, size + 1, size - 1];
+
+            for (let i = 0; i < maxIndex; i++) {
+                for (const direction of directions) {
+                    // Check if current position allows for a k-length line in this direction
+                    const currentRow = Math.floor(i / size);
+                    const currentCol = i % size;
+
+                    // Optimization to skip checks that start too close to the edge
+                    if (direction === 1 && currentCol > size - k) continue; // Horizontal
+                    if (direction === size && currentRow > size - k) continue; // Vertical
+                    if (direction === size + 1 && (currentRow > size - k || currentCol > size - k)) continue; // Diagonal Down-Right
+                    if (direction === size - 1 && (currentRow > size - k || currentCol < k - 1)) continue; // Diagonal Down-Left
+
+                    const result = checkLine(i, direction);
+                    if (result) return result;
+                }
+            }
+            return null;
+        }
+
+
+        function evaluateBoard(currentBoard, aiPlayer, humanPlayer) {
+            // Minimax is only feasible for 3x3, Connect 3. All other modes return a neutral score.
+            if (userProfile.gridSize > 3 || userProfile.winLength !== 3) return 0;
+
+            const result = checkWin(currentBoard);
+            if (result) {
+                return result.symbol === aiPlayer ? 10 : -10;
+            }
+            return 0;
+        }
+
+        function minimax(tempBoard, depth, isMaximizing, aiPlayer, humanPlayer) {
+            if (userProfile.gridSize > 3 || userProfile.winLength !== 3) return { score: 0, index: getAIMoveFallback(tempBoard) };
+
+            const score = evaluateBoard(tempBoard, aiPlayer, humanPlayer);
+
+            if (score === 10 || score === -10) {
+                return { score: score - depth, index: null };
+            }
+            if (tempBoard.every(cell => cell !== null)) {
+                return { score: 0, index: null };
+            }
+
+            const emptyIndices = tempBoard.map((val, i) => (val === null ? i : null)).filter(i => i !== null);
+            let bestMove = { score: isMaximizing ? -Infinity : Infinity, index: null };
+
+            for (const index of emptyIndices) {
+                tempBoard[index] = isMaximizing ? aiPlayer : humanPlayer;
+                const move = minimax(tempBoard, depth + 1, !isMaximizing, aiPlayer, humanPlayer);
+                tempBoard[index] = null;
+
+                if (isMaximizing) {
+                    if (move.score > bestMove.score) {
+                        bestMove = { score: move.score, index: index };
+                    }
+                } else {
+                    if (move.score < bestMove.score) {
+                        bestMove = { score: move.score, index: index };
+                    }
+                }
+            }
+            return bestMove;
+        }
+        
+        function getAIMoveFallback(currentBoard) {
+            const emptyIndices = currentBoard.map((val, i) => (val === null ? i : null)).filter(i => i !== null);
+            if (emptyIndices.length === 0) return null;
+            const randomIndex = Math.floor(Math.random() * emptyIndices.length);
+            return emptyIndices[randomIndex];
+        }
+
+        function getAIMove() {
+            // Use Minimax only for 3x3, Connect 3 Hard mode. Fallback to random for others.
+            if (userProfile.gameMode === 'PVA_HARD' && userProfile.gridSize === 3 && userProfile.winLength === 3) {
+                const aiPlayer = internalCurrentPlayer;
+                const humanPlayer = internalCurrentPlayer === 'X' ? 'O' : 'X';
+                const result = minimax([...board], 0, true, aiPlayer, humanPlayer);
+                // Minimax result index might be null on tie or edge case, fallback to random
+                return result.index !== null ? result.index : getAIMoveFallback(board);
+            }
+            
+            // PVA_EASY or large grid (unsolvable by current minimax)
+            return getAIMoveFallback(board);
+        }
+
+        // --- GAME INTERFACE LOGIC ---
+        
+        function getDisplaySymbol(internalSymbol) {
+            // Internal 'X' is Player 1, Internal 'O' is Player 2
+            let p1Symbol = 'X';
+            let p2Symbol = 'O';
+
+            if (userProfile.symbol === 'X' || userProfile.symbol === '★') {
+                p1Symbol = userProfile.symbol;
+                p2Symbol = userProfile.symbol === 'X' ? 'O' : '◇'; 
+            } else { // User symbol is 'O' or '◇'
+                p1Symbol = userProfile.symbol === 'O' ? 'X' : '★'; 
+                p2Symbol = userProfile.symbol;
+            }
+
+            return internalSymbol === 'X' ? p1Symbol : p2Symbol;
+        }
+
+        function getPlayerName(internalSymbol) {
+            if (userProfile.gameMode === 'PVP') {
+                return internalSymbol === 'X' ? playerNames.X : playerNames.O;
+            } else {
+                // Determine if 'X' or 'O' is the human player based on symbol choice
+                const internalUserSymbol = (userProfile.symbol === 'X' || userProfile.symbol === '★') ? 'X' : 'O';
+
+                if (internalSymbol === internalUserSymbol) {
+                    return userProfile.nickname;
+                } else {
+                    return 'AI';
+                }
+            }
+        }
+
+        function renderBoard() {
+            boardEl.innerHTML = '';
+            boardEl.style.gridTemplateColumns = `repeat(${userProfile.gridSize}, 1fr)`;
+            boardEl.style.gridTemplateRows = `repeat(${userProfile.gridSize}, 1fr)`;
+            
+            const cellBaseClasses = `cell rounded-lg shadow-md font-extrabold ${currentTheme.cell_bg} ${currentTheme.cell_border} border-2 ${currentTheme.text}`;
+
+            board.forEach((cellValue, index) => {
+                const cellEl = document.createElement('div');
+                cellEl.id = `cell-${index}`;
+                cellEl.classList.add(...cellBaseClasses.split(' '));
+                
+                const displayChar = cellValue ? getDisplaySymbol(cellValue) : '';
+                cellEl.innerHTML = displayChar;
+
+                cellEl.dataset.index = index;
+
+                if (cellValue) {
+                    cellEl.classList.add('occupied');
+                    
+                    // Use a highly contrasting color for symbols
+                    const symbolColor = cellValue === 'X' ? currentTheme.accent_color_css : currentTheme.secondary.split(' ')[0].replace('bg', 'text').replace('text', currentTheme.text.split('-').slice(-1)[0].includes('white') ? 'white' : 'gray-900');
+                    cellEl.style.color = symbolColor;
+                    
+                    const baseSize = 4.5;
+                    const sizeMultiplier = 3 / userProfile.gridSize;
+                    cellEl.style.fontSize = `${baseSize * sizeMultiplier}vmin`; 
+                }
+
+                if (winningCombo && winningCombo.combo && winningCombo.combo.includes(index)) {
+                    cellEl.classList.add('winning-cell');
+                    cellEl.style.backgroundColor = 'rgba(255, 255, 0, 0.2)'; // Failsafe yellow flash
+                }
+
+                if (isGameActive && !cellValue) {
+                    cellEl.addEventListener('click', handleCellClick);
+                    cellEl.classList.add('hover:ring-4', 'hover:ring-opacity-50');
+                    cellEl.classList.remove('occupied');
+                } else {
+                    cellEl.classList.remove('hover:ring-4', 'hover:ring-opacity-50');
+                }
+
+                boardEl.appendChild(cellEl);
+            });
+            
+            // Premium Undo Button logic
+            premiumUndoBtn.disabled = moveHistory.length === 0 || !isGameActive;
+            
+            // Visually disable the premium button if not premium
+            if (!userProfile.isPremium) {
+                premiumUndoBtn.classList.add('opacity-50', 'grayscale');
+            } else {
+                premiumUndoBtn.classList.remove('opacity-50', 'grayscale');
+            }
+        }
+
+        function updateGameInfo() {
+            const currentDisplaySymbol = getDisplaySymbol(internalCurrentPlayer);
+            
+            if (!isGameActive) {
+                if (winningCombo) {
+                    const winnerName = getPlayerName(winningCombo.symbol);
+                    gameInfoEl.textContent = `${winnerName} WINS! (${currentDisplaySymbol})`;
+                    gameInfoEl.className = gameInfoEl.className.replace(/bg-[a-z]+-\d+|text-[a-z]+-\d+/g, '').trim() + ` bg-green-500 text-white`;
+                } else {
+                    gameInfoEl.textContent = "It's a Draw!";
+                    gameInfoEl.className = gameInfoEl.className.replace(/bg-[a-z]+-\d+|text-[a-z]+-\d+/g, '').trim() + ` bg-yellow-500 text-black`;
+                }
+            } else {
+                const playerName = getPlayerName(internalCurrentPlayer);
+
+                // Ensure text color is contrasting (light secondary bg uses dark text, dark secondary bg uses white text)
+                let infoTextColor = 'text-white';
+                if (currentTheme.secondary.includes('yellow') || currentTheme.secondary.includes('cyan') || currentTheme.secondary.includes('red-400')) {
+                    infoTextColor = 'text-gray-900';
+                }
+                
+                gameInfoEl.textContent = `${playerName}'s Turn (${currentDisplaySymbol})`;
+                gameInfoEl.className = gameInfoEl.className.replace(/bg-[a-z]+-\d+|text-[a-z]+-\d+/g, '').trim() + ` ${currentTheme.secondary} ${infoTextColor} shadow-xl`;
+            }
+        }
+
+        function handleCellClick(event) {
+            const index = parseInt(event.currentTarget.dataset.index);
+
+            // Prevent human player from moving if it's AI's turn
+            if (userProfile.gameMode.startsWith('PVA')) {
+                const internalUserSymbol = (userProfile.symbol === 'X' || userProfile.symbol === '★') ? 'X' : 'O';
+                if (internalCurrentPlayer !== internalUserSymbol) {
+                    return; 
+                }
+            }
+            
+            if (board[index] || !isGameActive) return;
+
+            makeMove(index, internalCurrentPlayer);
+            
+            if (isGameActive && userProfile.gameMode.startsWith('PVA')) {
+                // AI move happens after human move in PVA modes
+                setTimeout(handleAIMove, 500);
+            }
+        }
+
+        function handleAIMove() {
+            if (!isGameActive) return;
+            
+            const internalUserSymbol = (userProfile.symbol === 'X' || userProfile.symbol === '★') ? 'X' : 'O';
+            if (internalCurrentPlayer === internalUserSymbol) return; 
+
+            const moveIndex = getAIMove();
+            if (moveIndex !== null) {
+                makeMove(moveIndex, internalCurrentPlayer);
+            }
+        }
+        
+        // UPDATED: handleUndo logic correction
+        function handleUndo() {
+            if (!userProfile.isPremium) {
+                showMessageBox(
+                    'Premium Feature Required', 
+                    'The **Premium Undo** feature allows you to go back moves, even against the AI! Activate the free trial in your **Profile**.', 
+                    'Close'
+                );
+                return;
+            }
+
+            if (moveHistory.length === 0) return;
+
+            // If game was over, reactivate it now.
+            if (!isGameActive) {
+                isGameActive = true;
+                winningCombo = null;
+            }
+            
+            let stepsToUndo = 1;
+
+            if (userProfile.gameMode.startsWith('PVA')) {
+                // In PVA, need to undo the AI's move and the player's move
+                stepsToUndo = 2;
+            }
+
+            for (let i = 0; i < stepsToUndo; i++) {
+                if (moveHistory.length > 0) {
+                    const lastMove = moveHistory.pop();
+                    board[lastMove.index] = null;
+                    internalCurrentPlayer = lastMove.player;
+                }
+            }
+            
+            playAudio(300, 0.1, 0.5);
+
+            updateGameInfo();
+            renderBoard();
+        }
+
+        function makeMove(index, internalPlayer) {
+            board[index] = internalPlayer;
+            moveHistory.push({ index: index, player: internalPlayer });
+            
+            playAudio(internalPlayer === 'X' ? 440 : 550, 0.1, 0.8);
+            
+            const winResult = checkWin(board);
+            const isDraw = board.every(cell => cell !== null);
+
+            if (winResult) {
+                isGameActive = false;
+                winningCombo = winResult; 
+                endGame(winResult.symbol, winResult.combo);
+            } else if (isDraw) {
+                isGameActive = false;
+                winningCombo = null; 
+                endGame(null); 
+            } else {
+                internalCurrentPlayer = internalCurrentPlayer === 'X' ? 'O' : 'X';
+                updateGameInfo();
+            }
+            renderBoard();
+        }
+
+        function endGame(winner, combo) {
+            // winningCombo is handled in makeMove (set to winResult or null).
+            
+            let resultKey;
+            
+            if (winner) {
+                const winnerName = getPlayerName(winner);
+                
+                // Only count wins/losses for the human user in PVA modes or P1 in PVP
+                if (userProfile.gameMode.startsWith('PVA')) {
+                    const internalUserSymbol = (userProfile.symbol === 'X' || userProfile.symbol === '★') ? 'X' : 'O';
+                    const userWon = winner === internalUserSymbol;
+                    resultKey = userWon ? 'wins' : 'losses';
+                } else { // PVP
+                    const userWon = winner === 'X'; // Assume P1 is the user whose profile tracks stats
+                    resultKey = userWon ? 'wins' : 'losses';
+                }
+
+                messageTitle.textContent = `${winnerName} Wins!`;
+                messageText.textContent = `Congratulations, ${winnerName} won the match!`;
+                
+                playAudio(resultKey === 'wins' ? 780 : 220, 0.5, 0.8);
+            } else {
+                resultKey = 'draws';
+                messageTitle.textContent = "Draw!";
+                messageText.textContent = "It's a draw. Good game!";
+                playAudio(330, 0.2, 0.6);
+            }
+            
+            // Prepare match history data
+            const matchData = {
+                result: resultKey,
+                mode: userProfile.gameMode,
+                size: userProfile.gridSize,
+                winLength: userProfile.winLength,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Log stats regardless of mode, but only update if the result is wins/losses/draws
+            if (['wins', 'losses', 'draws'].includes(resultKey)) {
+                updateStats(resultKey, matchData);
+            }
+
+            updateGameInfo();
+            renderBoard();
+            showMessageBox(messageTitle.textContent, messageText.textContent, 'Play Again');
+        }
+
+        function startGame() {
+            // Apply current PVP names if necessary
+            if (userProfile.gameMode === 'PVP') {
+                playerNames.X = playerXNameInput.value.trim() || 'Player 1';
+                playerNames.O = playerONameInput.value.trim() || 'Player 2';
+            } else {
+                playerNames.X = userProfile.nickname; // Only used if P1 is human
+                playerNames.O = 'AI';
+            }
+            
+            const boardSize = userProfile.gridSize * userProfile.gridSize;
+            board = Array(boardSize).fill(null);
+            internalCurrentPlayer = 'X'; 
+            isGameActive = true;
+            winningCombo = null;
+            moveHistory = [];
+
+            setSection('game');
+            
+            const internalUserSymbol = (userProfile.symbol === 'X' || userProfile.symbol === '★') ? 'X' : 'O';
+            const isAIStarting = userProfile.gameMode.startsWith('PVA') && internalUserSymbol === 'O'; // AI is internal 'X' and O is human.
+
+            if (isAIStarting) {
+                 setTimeout(handleAIMove, 500);
+            }
+
+            updateGameInfo();
+            renderBoard();
+        }
+
+        // --- UI UTILITIES (Navigation and Modal) ---
+
+        function setSection(section) {
+            currentSection = section;
+            
+            Object.values(views).forEach(view => view.classList.add('hidden'));
+
+            const targetView = views[section];
+            if (targetView) targetView.classList.remove('hidden');
+
+            applyUserProfile(userProfile); // Renders premium status and themes
+
+            // Close mobile sidebar if applicable
+            if (window.innerWidth < 1024) {
+                navSidebar.style.display = 'none';
+                // NOTE: The SVG stroke color is now controlled in applyTheme for better contrast
+                toggleNavBtn.querySelector('svg').outerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>';
+            }
+            
+            if (section === 'game') {
+                homeBtn.removeEventListener('click', exitGame);
+                homeBtn.addEventListener('click', exitGame);
+            }
+        }
+        
+        function exitGame() {
+            setSection('home');
+        }
+
+        function showMessageBox(title, text, buttonText) {
+            messageTitle.textContent = title;
+            messageText.textContent = text;
+            closeMessageBtn.textContent = buttonText;
+            
+            messageBox.classList.remove('hidden');
+            messageBox.classList.add('flex');
+            
+            // Re-apply button style as it might change based on theme
+            // Text color is now handled in applyTheme for consistency
+            closeMessageBtn.className = closeMessageBtn.className.replace(/bg-[a-z]+-\d+|text-[a-z]+-\d+|hover:bg-[a-z]+-\d+/g, '').trim() + ` ${currentTheme.primary} text-white transition-colors transform hover:scale-[1.01] active:scale-[0.99]`;
+
+        }
+
+        function hideMessageBox() {
+            messageBox.classList.add('hidden');
+            messageBox.classList.remove('flex');
+            // If the game is over, hideMessageBox restarts the game.
+            if (!isGameActive) startGame(); 
+        }
+
+        function toggleMobileNav() {
+            if (navSidebar.style.display === 'block') {
+                navSidebar.style.display = 'none';
+                toggleNavBtn.querySelector('svg').outerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>';
+            } else {
+                navSidebar.style.display = 'block';
+                toggleNavBtn.querySelector('svg').outerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+            }
+            applyTheme(currentTheme); // Re-apply theme to ensure icon color is correct after DOM manipulation
+        }
+
+        /**
+         * Converts uploaded file to Base64 and updates profile state.
+         */
+        function handlePhotoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64Image = e.target.result;
+                userProfile.photo = base64Image;
+                profilePhotoPreview.src = base64Image;
+                saveProfileBtn.disabled = false;
+                saveProfile(userProfile);
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // --- EVENT LISTENERS ---
+        
+        startGameBtn.addEventListener('click', startGame);
+        premiumUndoBtn.addEventListener('click', handleUndo); 
+        togglePremiumBtn.addEventListener('click', togglePremium); 
+        closeMessageBtn.addEventListener('click', hideMessageBox);
+        toggleNavBtn.addEventListener('click', toggleMobileNav);
+        profilePhotoInput.addEventListener('change', handlePhotoUpload); 
+
+        // Navigation clicks
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                setSection(e.currentTarget.dataset.section);
+            });
+        });
+
+        // Profile input listeners
+        [nicknameInput, fullnameInput, dobInput, genderSelector, occupationInput, symbolSelector, themeSelector, gameModeSelector, gridSizeSelector, winLengthSelector, playerXNameInput, playerONameInput].forEach(el => {
+            el.addEventListener('input', updateProfileFromUI);
+        });
+        
+        gridSizeSelector.addEventListener('change', (e) => {
+            updateWinLengthOptions(e.target.value);
+            updateProfileFromUI();
+        });
+
+        saveProfileBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            saveProfile(userProfile);
+        });
+
+        // --- INITIALIZATION ---
+        
+        window.onload = function() {
+            // Step 1: Apply default theme instantly
+            applyTheme(THEMES.dark); 
+            
+            // Step 2: Set the initial view structure
+            setSection('home'); 
+
+            // Step 3: Load the profile from local storage immediately (instant access)
+            loadProfileFromLocalStorage();
+        };
+    </script>
+</body>
+</html>
